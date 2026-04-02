@@ -1410,7 +1410,7 @@ function GestionPubPage() {
 
       // Flaguer les gros CP (> 10k logements effectifs) avec une densité < 50% de la moyenne
       const flagged: CpFlag[] = []
-      for (const { cp, logementsRaw, logementsEffectifs, leads, densite } of cpDensities) {
+      for (const { cp, logementsEffectifs, leads, densite } of cpDensities) {
         if (logementsEffectifs <= 10000) continue
         const ecartPct = ((densite - densiteMoyenne) / densiteMoyenne) * 100
         if (ecartPct < -50) {
