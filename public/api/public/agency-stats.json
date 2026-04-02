@@ -1,0 +1,15 @@
+{
+  "agence": "SMB - L' Agence Immobiliere Engagee",
+  "stats": {
+    "nb_leads": 127,
+    "pct_lead_contacte": 68.5,
+    "pct_relance_prevu": 45.2,
+    "nb_relance_moy": 2.9,
+    "mandats_signes": 8
+  },
+  "test_identifiers": {
+    "num_gcl": "CU001MRX8EBG3G",
+    "nom_agence": "SMB - L' Agence Immobiliere Engagee"
+  },
+  "note": "Donnee de test statique - pour integration dynamique, utiliser le serveur backend"
+}

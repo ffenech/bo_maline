@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Google Analytics credentials
+ga4-service-account.json
+ga4-cache.json
+
+# Gmail credentials
+gmail-credentials.json
+gmail-token.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+ga4-cache-v1.json
+ga4-cache-v2.json
+leads-test-ab-selected-clients.json
+ga4-cache-filtered.json
