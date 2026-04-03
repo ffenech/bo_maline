@@ -552,6 +552,67 @@ async function fetchGA4DailyVisitorsByMultipleAgencies(propertyId: string, agenc
   }
 }
 
+// Obtenir les visiteurs temps réel (activeUsers des 30 dernières minutes) pour une propriété
+async function fetchRealtimeActiveUsers(propertyId: string): Promise<number> {
+  const client = await initGA4Client()
+  if (!client) throw new Error('Client GA4 non disponible')
+
+  const [response] = await client.runRealtimeReport({
+    property: `properties/${propertyId}`,
+    metrics: [{ name: 'activeUsers' }],
+  })
+
+  return parseInt(response.rows?.[0]?.metricValues?.[0]?.value || '0')
+}
+
+// Obtenir les visiteurs du jour via rapport GA4 (dateRange = today)
+async function fetchTodayVisitors(propertyId: string): Promise<number> {
+  const client = await initGA4Client()
+  if (!client) throw new Error('Client GA4 non disponible')
+
+  const [response] = await client.runReport({
+    property: `properties/${propertyId}`,
+    dateRanges: [{ startDate: 'today', endDate: 'today' }],
+    metrics: [{ name: 'activeUsers' }],
+  })
+
+  return parseInt(response.rows?.[0]?.metricValues?.[0]?.value || '0')
+}
+
+export interface RealtimeVisitors {
+  v2: number
+  v1: number
+  es: number
+  realtime_v2: number
+  realtime_es: number
+  date: string
+}
+
+// Obtenir les visiteurs d'aujourd'hui (combinaison runReport today + runRealtimeReport)
+export async function getTodayVisitors(): Promise<RealtimeVisitors> {
+  const today = new Date()
+  const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  const [todayV2, todayV1, todayEs, realtimeV2, realtimeEs] = await Promise.all([
+    fetchTodayVisitors(propertyIdV2).catch(() => 0),
+    fetchTodayVisitors(propertyIdV1).catch(() => 0),
+    fetchTodayVisitors(propertyIdEs).catch(() => 0),
+    fetchRealtimeActiveUsers(propertyIdV2).catch(() => 0),
+    fetchRealtimeActiveUsers(propertyIdEs).catch(() => 0),
+  ])
+
+  // Prendre le max entre le rapport du jour et le temps réel
+  // Le rapport du jour a du retard, le realtime est instantané mais ne couvre que 30 min
+  return {
+    v2: Math.max(todayV2, realtimeV2),
+    v1: todayV1,
+    es: Math.max(todayEs, realtimeEs),
+    realtime_v2: realtimeV2,
+    realtime_es: realtimeEs,
+    date,
+  }
+}
+
 // Obtenir les visiteurs quotidiens V2 filtrés par agences (rewrite) - OPTIMISÉ
 export async function getDailyVisitorsV2ByAgencies(agencyRewrites: string[]): Promise<DailyVisitors[]> {
   console.log(`🔍 [GA4] getDailyVisitorsV2ByAgencies appelé avec ${agencyRewrites.length} agences`)

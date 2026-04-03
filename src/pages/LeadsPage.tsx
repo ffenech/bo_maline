@@ -138,7 +138,6 @@ function LeadsPage() {
             visitorsMap[item.date] = item.visitors
           })
         }
-        setVisitors(visitorsMap)
 
         // Traiter les visiteurs GA4 ES
         const visitorsEsMap: VisitorData = {}
@@ -147,6 +146,22 @@ function LeadsPage() {
             visitorsEsMap[item.date] = item.visitors
           })
         }
+
+        // Récupérer les visiteurs temps réel pour aujourd'hui (cache court 30s)
+        try {
+          const todayData = await cachedFetch<{ v2: number; v1: number; es: number; date: string }>(
+            `${apiUrl}/ga4/today-visitors`, undefined, 30 * 1000
+          )
+          if (todayData?.date) {
+            // Écraser les valeurs du jour avec les données temps réel (plus fraîches)
+            if (todayData.v2 > 0) visitorsMap[todayData.date] = todayData.v2
+            if (todayData.es > 0) visitorsEsMap[todayData.date] = todayData.es
+          }
+        } catch (e) {
+          console.warn('⚠️ Visiteurs temps réel non disponibles:', e)
+        }
+
+        setVisitors(visitorsMap)
         setVisitorsEs(visitorsEsMap)
 
         // Traiter les remarques
@@ -937,14 +952,17 @@ function LeadsPage() {
               {commits.length > 0 && (
                 <div className="border-t border-gray-200 pt-2 mt-1 space-y-1.5">
                   <p className="text-xs font-semibold text-gray-600">Déploiements estimateur :</p>
-                  {commits.map((c: any, i: number) => (
+                  {commits.map((c: any, i: number) => {
+                    const [y, m, d] = c.date.split('-')
+                    return (
                     <div key={i} className="flex items-start gap-1.5">
                       <span className="text-xs mt-0.5" style={{ color: impactColor(c.impact) }}>
                         {c.impact === 'positive' ? '▲' : c.impact === 'negative' ? '▼' : '●'}
                       </span>
-                      <p className="text-xs text-gray-700">{c.summary}</p>
+                      <p className="text-xs text-gray-700"><span className="font-semibold text-gray-500">{d}/{m}/{y}</span> {c.summary}</p>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

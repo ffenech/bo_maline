@@ -8,7 +8,7 @@ import { execSync } from 'node:child_process'
 import { Pool, type PoolConfig } from 'pg'
 import mysql from 'mysql2/promise'
 import { createSSHTunnel, closeSSHTunnel, setOnTunnelDied } from './ssh-tunnel.js'
-import { getDailyVisitorsV2, getDailyVisitorsV1, getDailyVisitorsEs, getConversionFunnel } from './ga4-analytics.js'
+import { getDailyVisitorsV2, getDailyVisitorsV1, getDailyVisitorsEs, getConversionFunnel, getTodayVisitors } from './ga4-analytics.js'
 import {
   getAuthUrl,
   exchangeCodeForToken,
@@ -1540,6 +1540,22 @@ app.get('/api/ga4/daily-visitors-es', async (req, res) => {
     res.json(data)
   } catch (error) {
     console.error('Erreur lors de la récupération des visiteurs GA4 ES:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Visiteurs temps réel du jour (runRealtimeReport + runReport today)
+app.get('/api/ga4/today-visitors', async (req, res) => {
+  try {
+    const cacheKey = 'ga4-today-visitors'
+    const cached = getCached<any>(cacheKey)
+    if (cached) return res.json(cached)
+
+    const data = await getTodayVisitors()
+    setCache(cacheKey, data, 2 * 60 * 1000) // Cache 2 minutes
+    res.json(data)
+  } catch (error) {
+    console.error('Erreur lors de la récupération des visiteurs temps réel:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
