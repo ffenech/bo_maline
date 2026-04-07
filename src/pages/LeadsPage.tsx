@@ -374,7 +374,7 @@ function LeadsPage() {
   // Données hebdomadaires pour les courbes de taux de conversion
   const weeklyConversionData = useMemo(() => {
     if (!currentDailyLeads.length) return []
-    // Exclure aujourd'hui (journée incomplète qui fausserait la semaine en cours)
+    // Exclure uniquement aujourd'hui (journée incomplète)
     const now = new Date()
     const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     // Grouper par semaine ISO (lundi → dimanche)
@@ -410,12 +410,17 @@ function LeadsPage() {
         const d = new Date(weekStart + 'T00:00:00')
         const endOfWeek = new Date(d)
         endOfWeek.setDate(d.getDate() + 6)
-        const label = `${d.getDate()}/${d.getMonth() + 1}`
+        const weekEndKey = `${endOfWeek.getFullYear()}-${String(endOfWeek.getMonth() + 1).padStart(2, '0')}-${String(endOfWeek.getDate()).padStart(2, '0')}`
+        // Label X-axis = date de fin de semaine (dimanche)
+        const label = `${endOfWeek.getDate()}/${endOfWeek.getMonth() + 1}`
+        const startLabel = `${d.getDate()}/${d.getMonth() + 1}`
         // Trouver les commits de cette semaine
-        const weekCommits = siteCommits.filter(c => c.date >= weekStart && c.date <= endOfWeek.toISOString().split('T')[0])
+        const weekCommits = siteCommits.filter(c => c.date >= weekStart && c.date <= weekEndKey)
         return {
           week: label,
           weekStart,
+          weekEnd: weekEndKey,
+          weekRangeLabel: `${startLabel} → ${label}`,
           tauxConversionLead: data.visitors > 0 ? parseFloat(((data.leads / data.visitors) * 100).toFixed(2)) : 0,
           tauxConversionTelValide: data.visitors > 0 ? parseFloat(((data.validatedPhone / data.visitors) * 100).toFixed(2)) : 0,
           commits: weekCommits,
@@ -952,7 +957,7 @@ function LeadsPage() {
           const commits = data.commits || []
           return (
             <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-3 max-w-xs">
-              <p className="text-sm font-semibold text-gray-900 mb-1">Semaine du {data.week} — {value}%</p>
+              <p className="text-sm font-semibold text-gray-900 mb-1">Semaine {data.weekRangeLabel} — {value}%</p>
               {commits.length > 0 && (
                 <div className="border-t border-gray-200 pt-2 mt-1 space-y-1.5">
                   <p className="text-xs font-semibold text-gray-600">Déploiements estimateur :</p>
