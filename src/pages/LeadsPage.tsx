@@ -374,10 +374,14 @@ function LeadsPage() {
   // Données hebdomadaires pour les courbes de taux de conversion
   const weeklyConversionData = useMemo(() => {
     if (!currentDailyLeads.length) return []
+    // Exclure aujourd'hui (journée incomplète qui fausserait la semaine en cours)
+    const now = new Date()
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     // Grouper par semaine ISO (lundi → dimanche)
     const weekMap = new Map<string, { visitors: number; leads: number; validatedPhone: number }>()
     currentDailyLeads.forEach(day => {
       const dateKey = day.date.split('T')[0]
+      if (dateKey === todayKey) return
       const d = new Date(dateKey + 'T00:00:00')
       // Trouver le lundi de la semaine
       const dayOfWeek = d.getDay()

@@ -4206,6 +4206,123 @@ async function syncLeadsStatsToSupabase(): Promise<void> {
   }
 }
 
+// Mini-sync incrémental: ne recalcule que la ligne d'aujourd'hui (V1, V2, ES)
+// Beaucoup plus léger que la full sync (3 lignes upsertées, requêtes SQL filtrées sur CURRENT_DATE)
+// Préserve la valeur ga4_visitors existante (rafraîchie par la full sync 6h)
+async function syncTodayLeadsStatsToSupabase(): Promise<void> {
+  const startTime = Date.now()
+  try {
+    if (!dbPool) return
+
+    const SALE_PROJECTS = `'less1Year', 'between1And2Years', 'more2Years', 'onGoing', 'asSoonAsPossible', 'in3Months', 'less6Months'`
+    const EXCLUDED_ORIGINS = `'storeFlyer', 'qrcode', 'import', 'noticePassage', 'iframe', 'manual'`
+
+    const v2ClientIds = await fetchEstimateurAgencies()
+    const v2Arr = Array.from(v2ClientIds)
+    if (v2Arr.length === 0) return
+    const v2Placeholders = v2Arr.map((_, i) => `$${i + 1}`).join(',')
+
+    // Une seule requête SQL agrège V2/V1/ES + total + phone + validated phone pour aujourd'hui
+    const queries: Promise<any>[] = [
+      // V2 today
+      dbPool.query(`
+        SELECT
+          COUNT(*)::integer as total_leads,
+          COUNT(CASE WHEN p.phone IS NOT NULL THEN 1 END)::integer as leads_with_phone,
+          COUNT(CASE WHEN p.phone_valid = 'validated' THEN 1 END)::integer as leads_with_validated_phone
+        FROM property p
+        LEFT JOIN agency a ON p.id_agency = a.id
+        LEFT JOIN client c ON a.id_client = c.id_client
+        WHERE a.id_client IN (${v2Placeholders})
+          AND c.demo IS NOT TRUE
+          ${slugFilter()}
+          AND p.sale_project IN (${SALE_PROJECTS})
+          AND (p.origin IS NULL OR p.origin NOT IN (${EXCLUDED_ORIGINS}))
+          AND DATE(p.created_date) = CURRENT_DATE
+      `, v2Arr),
+      // V1 today
+      dbPool.query(`
+        SELECT
+          COUNT(*)::integer as total_leads,
+          COUNT(CASE WHEN p.phone IS NOT NULL THEN 1 END)::integer as leads_with_phone,
+          COUNT(CASE WHEN p.phone_valid = 'validated' THEN 1 END)::integer as leads_with_validated_phone
+        FROM property p
+        LEFT JOIN agency a ON p.id_agency = a.id
+        LEFT JOIN client c ON a.id_client = c.id_client
+        WHERE a.id_client NOT IN (${v2Placeholders})
+          AND c.demo IS NOT TRUE
+          ${slugFilter()}
+          AND p.sale_project IN (${SALE_PROJECTS})
+          AND (p.origin IS NULL OR p.origin NOT IN (${EXCLUDED_ORIGINS}))
+          AND DATE(p.created_date) = CURRENT_DATE
+      `, v2Arr),
+      // ES today
+      dbPool.query(`
+        SELECT
+          COUNT(DISTINCT p.id_property)::integer as total_leads,
+          COUNT(CASE WHEN p.phone IS NOT NULL THEN 1 END)::integer as leads_with_phone,
+          COUNT(CASE WHEN p.phone_valid = 'validated' THEN 1 END)::integer as leads_with_validated_phone
+        FROM property p
+        INNER JOIN agency a ON p.id_agency = a.id
+        INNER JOIN client c ON a.id_client = c.id_client
+        WHERE c.locale = 'es_ES'
+          AND c.demo IS NOT TRUE
+          ${slugFilter()}
+          AND p.sale_project IN (${SALE_PROJECTS})
+          AND (p.origin IS NULL OR p.origin NOT IN (${EXCLUDED_ORIGINS}))
+          AND DATE(p.created_date) = CURRENT_DATE
+      `)
+    ]
+
+    const [v2Res, v1Res, esRes] = await Promise.all(queries)
+
+    // Date "aujourd'hui" en timezone serveur (CET en prod)
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    // Récupérer les ga4_visitors existants pour ne pas les écraser
+    const { data: existing } = await supabaseAdmin
+      .from('leads_stats_daily')
+      .select('source, ga4_visitors')
+      .eq('stat_date', today)
+      .in('source', ['v1', 'v2', 'es'])
+    const ga4By: Record<string, number> = {}
+    for (const r of existing || []) ga4By[r.source as string] = (r as any).ga4_visitors || 0
+
+    const buildRow = (source: 'v1' | 'v2' | 'es', row: any) => ({
+      source,
+      stat_date: today,
+      total_leads: parseInt(row?.total_leads) || 0,
+      leads_with_phone: parseInt(row?.leads_with_phone) || 0,
+      leads_with_validated_phone: parseInt(row?.leads_with_validated_phone) || 0,
+      ga4_visitors: ga4By[source] || 0,
+      synced_at: new Date().toISOString()
+    })
+
+    const rows = [
+      buildRow('v2', v2Res.rows[0]),
+      buildRow('v1', v1Res.rows[0]),
+      buildRow('es', esRes.rows[0])
+    ]
+
+    const { error } = await supabaseAdmin
+      .from('leads_stats_daily')
+      .upsert(rows, { onConflict: 'source,stat_date', ignoreDuplicates: false })
+    if (error) {
+      console.error('❌ [leads-today-sync] Upsert error:', error.message)
+      return
+    }
+
+    // Invalider les caches mémoire pour que l'API renvoie immédiatement les nouvelles valeurs
+    invalidateCache('leads-')
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
+    console.log(`✅ [leads-today-sync] ${today} V2=${rows[0].total_leads} V1=${rows[1].total_leads} ES=${rows[2].total_leads} (${elapsed}s)`)
+  } catch (error) {
+    console.error('❌ [leads-today-sync] Erreur:', error)
+  }
+}
+
 // --- Endpoint force-sync leads ---
 app.get('/api/leads/force-sync', async (_req, res) => {
   try {
@@ -7258,6 +7375,14 @@ async function startServer() {
         console.error('❌ [leads-sync] Erreur sync périodique:', e)
       })
     }, 6 * 60 * 60 * 1000)
+
+    // Mini-sync incrémental "aujourd'hui uniquement" toutes les 90s
+    // Léger (3 lignes upsertées, requêtes SQL filtrées sur CURRENT_DATE)
+    setInterval(() => {
+      syncTodayLeadsStatsToSupabase().catch(e => {
+        console.error('❌ [leads-today-sync] Erreur:', e)
+      })
+    }, 90 * 1000)
 
     // Synchronisation des stats pub vers Supabase
     setTimeout(() => {
