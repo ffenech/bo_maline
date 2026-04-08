@@ -445,7 +445,7 @@ function LeadsPage() {
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
       const monday = new Date(d)
       monday.setDate(d.getDate() + mondayOffset)
-      const weekKey = monday.toISOString().split('T')[0]
+      const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
 
       const visitorsCount = currentVisitors[dateKey] || 0
       const phoneStat = currentDailyPhoneStats.find(s => s.date.split('T')[0] === dateKey)
