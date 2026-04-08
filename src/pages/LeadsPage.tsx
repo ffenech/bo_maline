@@ -336,39 +336,96 @@ function LeadsPage() {
   }, [currentDailyLeads, currentDailyPhoneStats, visitors])
 
   // Commits impactants du site estimateur (estimerlogement.fr)
+  // Historique à partir du 29/09/2025
   const siteCommits: { date: string; impact: 'positive' | 'negative' | 'neutral'; summary: string }[] = [
-    // Août-Sep 2025 — Stabilisation initiale
-    { date: '2025-08-31', impact: 'positive', summary: 'Fix boucle infinie page typologie — déblocage étape 1' },
-    { date: '2025-09-05', impact: 'positive', summary: 'Loading states boutons + remplacement alert() par Toasts' },
-    { date: '2025-09-07', impact: 'positive', summary: 'Fix bouton étage RDC bloqué (floor=0 falsy) + distance non-éligible autorisée' },
-    { date: '2025-09-09', impact: 'positive', summary: 'Intégration complète workflow estimation (insert, distance, prix) — nombreux flux cassés corrigés' },
-    { date: '2025-09-10', impact: 'positive', summary: 'Suppression timeout 15s prix + cache résultat prix — moins de drop-off' },
-    { date: '2025-09-11', impact: 'positive', summary: 'Fix boutons typologie mobile (overflow iPhone 12)' },
-    // Oct 2025
-    { date: '2025-10-21', impact: 'neutral', summary: 'Simplification UI page tel — CTA avec flèche, placeholder modifié' },
-    { date: '2025-10-23', impact: 'negative', summary: 'Validation adresse BAN stricte — risque blocage si adresse imparfaite' },
-    // Nov 2025
-    { date: '2025-11-27', impact: 'positive', summary: 'Autocomplétion DOM-TOM (Réunion, Guadeloupe, Martinique)' },
-    // Déc 2025
-    { date: '2025-12-18', impact: 'positive', summary: 'Fix texte espagnol sur page FR + calendrier RDV + affichage prix amélioré' },
-    { date: '2025-12-24', impact: 'positive', summary: 'Soumission tel non-bloquante + formatage +33 — moins d\'utilisateurs bloqués' },
-    { date: '2025-12-29', impact: 'positive', summary: 'Fallback BAN si erreur API adresse — utilisateurs ne restent plus bloqués' },
-    // Jan 2026
-    { date: '2026-01-06', impact: 'positive', summary: 'Formulaire fallback + autocomplétion BAN si Google Maps HS' },
-    { date: '2026-01-19', impact: 'negative', summary: 'Bouton tel plus petit (plus full-width) — cible réduite sur mobile' },
-    { date: '2026-01-21', impact: 'neutral', summary: 'Refonte layout pages estimation + loading 600→800ms' },
-    { date: '2026-01-23', impact: 'neutral', summary: 'Migration GTM vers Stape (1st party) — risque si mal configuré' },
-    // Fév 2026
-    { date: '2026-02-09', impact: 'neutral', summary: 'Chat bubbles dynamiques depuis API (risque si API lente)' },
-    { date: '2026-02-10', impact: 'neutral', summary: 'Session tracking + analytics reset — changement de mesure' },
-    { date: '2026-02-16', impact: 'positive', summary: 'Fix format tel SMS (0033→+33 E.164) — corrige échecs livraison SMS' },
-    { date: '2026-02-20', impact: 'negative', summary: 'Champ obligatoire "nb pièces" ajouté + ordre étapes modifié — friction accrue' },
-    { date: '2026-02-27', impact: 'positive', summary: 'SMS relance 5min au lieu de 30min — rattrape utilisateurs engagés' },
-    // Mar 2026
-    { date: '2026-03-06', impact: 'positive', summary: 'Facebook Advanced Matching — meilleure qualité trafic pub' },
-    { date: '2026-03-13', impact: 'negative', summary: 'Codes vérification 3→5 chiffres — friction au moment critique' },
-    { date: '2026-03-15', impact: 'positive', summary: 'Nettoyage tracking dupliqué — bundle plus léger, pages plus rapides' },
-    { date: '2026-03-19', impact: 'positive', summary: 'Refactor init agent — chargement plus fiable via liens SMS' },
+    // ─── Oct 2025 ─── Internationalisation ES + tracking
+    { date: '2025-10-02', impact: 'neutral', summary: 'Refonte i18n FR/ES : traduction complète tunnel + autocomplete Google Maps Espagne (country=es) — gros chantier multi-fichiers' },
+    { date: '2025-10-03', impact: 'positive', summary: 'Extraction code postal depuis Google Places + envoi city_es/zipcode_es à l\'API prix ES — corrige estimations ES sans CP' },
+    { date: '2025-10-05', impact: 'neutral', summary: 'Force language des bulles à la création d\'agence + i18n pages légales (CGU, mentions, charte RGPD)' },
+    { date: '2025-10-06', impact: 'neutral', summary: 'Support Catalan (langue + traductions emails/SMS)' },
+    { date: '2025-10-07', impact: 'positive', summary: 'Tracking Meta Pixel : normalisation value/currency Lead (200-500€, 2 décimales, EUR) — passage de 55% à 90%+ d\'événements valides sur 26 ad sets + retrait Eruda mobile (page /estimation plus légère)' },
+    { date: '2025-10-12', impact: 'neutral', summary: 'Création auto agences ES + simulation SMS pour slugs demo_ + traduction email estimation non-vendeur ES + page estimation entièrement traduite' },
+    { date: '2025-10-14', impact: 'positive', summary: 'Validation tel ES (9 chiffres commençant par 6-9) côté client + serveur, format CM.com (0034XXXXXXXXX) — corrige rejets SMS Espagne' },
+    { date: '2025-10-15', impact: 'neutral', summary: 'Endpoint insert_rdv_es pour Espagne + séparation email propriétaire / email agent dans payload sendrdv' },
+    { date: '2025-10-21', impact: 'positive', summary: 'Correction IP client pour tracking Meta/Google sur VPS OVH (CF-Connecting-IP → X-Forwarded-For → X-Real-IP) + endpoint /api/debug/ip-headers + IP correcte sur send-sms — résout problème 0.0.0.0 dans events PageView/Lead/Complete Registration' },
+    { date: '2025-10-22', impact: 'neutral', summary: 'Nouvelle API agences avec récupération codes postaux depuis base externe + filtrage auto agences/CP invalides' },
+    { date: '2025-10-23', impact: 'negative', summary: 'Validation adresse BAN stricte au clic Continuer : si voie numérotée détectée et numéro absent → blocage de la redirection. Risque élevé de drop-off si BAN ne reconnaît pas l\'adresse exacte' },
+    { date: '2025-10-29', impact: 'positive', summary: 'Fix extraction floor (etage_bien depuis URL avec fallback etage) — adresse RDC ne plante plus' },
+    { date: '2025-10-30', impact: 'negative', summary: 'Désactivation insertion estimation à l\'étape téléphone (nom/email manquants obligatoires API) + format tel 0034 ES — moins d\'estimations enregistrées en amont du tunnel' },
+
+    // ─── Nov 2025 ─── Multi-domaine ES + autocomplete DOM-TOM
+    { date: '2025-11-04', impact: 'positive', summary: 'Fix double appel get_price_es.php pour non-vendeurs + validation stricte du prix retourné — moins d\'erreurs et calculs dupliqués' },
+    { date: '2025-11-10', impact: 'positive', summary: 'Garantie d\'un uniqueId + agent valide avant get_price + acceptation IDs numériques pour projet de vente' },
+    { date: '2025-11-16', impact: 'positive', summary: 'Traductions ES complètes (hors admin) : autocomplete ES, get_price_es.php avec city_es/zipcode_es, SMS +34 9 chiffres, tracking PageView/Lead/Complete Registration en ES, email + footer ES' },
+    { date: '2025-11-18', impact: 'neutral', summary: 'Bloc prise de RDV : suppression vérification numéro dans formulaires + traduction jours/mois ES + ajout locale=es dans payload sendrdv' },
+    { date: '2025-11-20', impact: 'neutral', summary: 'Mode simulation envoi SMS renforcé pour Espagne + recherche agence par external ID si non trouvée par ID interne' },
+    { date: '2025-11-21', impact: 'positive', summary: 'Simplification vérif uniqueId/agentId avant get_price : crée un uniqueId si manquant, appelle l\'API agent si invalide — moins de blocages page estimation' },
+    { date: '2025-11-26', impact: 'positive', summary: 'Cache localStorage pour adresse + reverse geocoding Google Maps + agent rechargé au changement d\'adresse + fix paramètre agence dans toutes les redirections — moins de pertes contextuelles' },
+    { date: '2025-11-27', impact: 'positive', summary: 'Autocomplétion + geocoding étendus aux DOM-TOM (Réunion, Guadeloupe, Martinique) + force-dynamic sur routes API utilisant request — fin des erreurs de build en prod sur ces pages' },
+
+    // ─── Déc 2025 ─── Refactor backend, alertes erreurs, refonte page estimation
+    { date: '2025-12-07', impact: 'positive', summary: 'Refactor récupération agent (priorité API + fallback retries) + agency by slug au lieu d\'external ID + retries get_price selon erreur — moins de pages estimation cassées' },
+    { date: '2025-12-08', impact: 'neutral', summary: 'Format tel ES (0034) côté API SMS + EstimationContext démarré dès sélection adresse pour traçage du tunnel' },
+    { date: '2025-12-09', impact: 'neutral', summary: 'Tracking multi-domaine (estimerlogement.fr + valorar-vivienda.es) + langage HTML dynamique selon domaine + injection country dans user data' },
+    { date: '2025-12-11', impact: 'positive', summary: 'Fix Facebook : on ne modifie plus le cookie fbc (anti-pénalité score qualité Meta) + ajout données correspondance avancée (zp, ct, country, currency)' },
+    { date: '2025-12-14', impact: 'neutral', summary: 'Refonte handling agency ID dans tunnel + URL estimation avec slug + external ID dans data structure' },
+    { date: '2025-12-15', impact: 'positive', summary: 'Facebook Graph API v18 → v21 + extraction fbclid direct depuis URL + génération fbc depuis fbclid si cookie absent (best practice Meta 2025) + debug WebView Facebook' },
+    { date: '2025-12-17', impact: 'positive', summary: 'Refonte complète page /estimation : layout mobile-first + design system emerald — meilleure lisibilité et conversion finale' },
+    { date: '2025-12-18', impact: 'positive', summary: 'Page estimation : calendrier de prise de RDV intégré + auto-scroll + pré-estimation personnalisée + alertes 500 via logAndAlert500 sur toutes routes tracking (FB, GA4, Google Ads) + force-dynamic sur API analytics' },
+    { date: '2025-12-19', impact: 'neutral', summary: 'Refactor analyse funnel : étapes entry/main, stats sessions/agences/sources de trafic, taux drop-off — meilleure mesure interne mais pas d\'effet user' },
+    { date: '2025-12-20', impact: 'positive', summary: 'ClientErrorBoundary global + useGlobalErrorHandler pour erreurs JS/promises non gérées — robustesse accrue, moins de pages blanches' },
+    { date: '2025-12-21', impact: 'positive', summary: 'Système alertes email comprehensif : capture erreurs Google Maps, suivi redirections EstimationGuard, timeout API 30s, cooldown alertes 1 min — détection rapide des problèmes prod' },
+    { date: '2025-12-22', impact: 'positive', summary: 'Insertion estimation passe en MySQL direct (suppression appel API externe) + lead zone en query MySQL directe + venteId pour identifier projet de vente + GTM unique event ID — fiabilité et perfo accrues' },
+    { date: '2025-12-24', impact: 'positive', summary: 'Format tel +33 E.164 + soumission tel non-bloquante + agentId fallback + résolution agenceId via userId + alertes non-bloquantes paramètres manquants — moins d\'utilisateurs bloqués au tel' },
+    { date: '2025-12-25', impact: 'positive', summary: 'Filtrage erreurs WebView Facebook + Safari mode privé + localStorage erreurs + iOS < 15.4 Google Maps — moins de bruit dans les alertes' },
+    { date: '2025-12-29', impact: 'positive', summary: 'Refactor ConversionHero : flow validation adresse via BAN simplifié + fallback OpenCage si CP/ville manquants + détection bots dans error reporting + Next.js 14.2.35' },
+
+    // ─── Jan 2026 ─── Stabilisation + refonte UI
+    { date: '2026-01-06', impact: 'positive', summary: 'Formulaire de fallback complet avec autocomplétion BAN si Google Maps HS (loadError ou googleMapsApiError) + monitoring activation fallback en prod' },
+    { date: '2026-01-19', impact: 'negative', summary: 'Bouton page tel : passage de full-width à compact — cible tactile réduite sur mobile, possible baisse de taux de clic' },
+    { date: '2026-01-21', impact: 'neutral', summary: 'Refonte layout pages tunnel + délai loader popup 600→800ms — friction visuelle légèrement accrue' },
+    { date: '2026-01-23', impact: 'neutral', summary: 'Migration GTM vers Stape (1st party tagging) — risque de perte de tracking si mal configuré, gain de qualité de matching côté serveur si OK' },
+
+    // ─── Fév 2026 ─── Tracking, polyfills, refonte étapes
+    { date: '2026-02-05', impact: 'positive', summary: 'Filtrage erreurs in-app browsers (Facebook, Instagram, etc.) + erreurs non-bloquantes — alertes plus pertinentes' },
+    { date: '2026-02-09', impact: 'neutral', summary: 'Chat bubbles dynamiques chargées depuis API (cache 5 min) + rendu via API data — risque ralentissement si API lente, gain de flexibilité' },
+    { date: '2026-02-10', impact: 'neutral', summary: 'Session tracking estimation + analytics reset functionality + sessionId dans liens email — changement de méthode de mesure (peut altérer compa historique)' },
+    { date: '2026-02-13', impact: 'neutral', summary: 'Refactor page tel : meilleur handling téléphone + construction des paramètres URL — pas d\'effet visible user' },
+    { date: '2026-02-16', impact: 'positive', summary: 'Fix format tel SMS (0033→+33 E.164) + agency title dynamique dans SMS — corrige échecs livraison SMS pour numéros mal formatés' },
+    { date: '2026-02-19', impact: 'positive', summary: 'Logique de rotation d\'attribution d\'agent + résolution agency ID sur toutes les pages estimation — distribution leads plus équitable' },
+    { date: '2026-02-20', impact: 'negative', summary: 'Champ "nb chambres" rendu obligatoire + refonte styles boutons + ordre étapes modifié + polyfill HTMLDialogElement (anciens iOS) — friction accrue mais compatibilité élargie' },
+    { date: '2026-02-23', impact: 'neutral', summary: 'Refactor handling param prix + handling agency dans navigation cross-pages' },
+    { date: '2026-02-24', impact: 'positive', summary: 'Bulles personnalisées sur page estimation-renove + meilleure handling Google Maps errors + polyfill HTMLDialogElement — plus de pages cassées sur navigateurs anciens' },
+    { date: '2026-02-26', impact: 'positive', summary: 'Renforcement gestion paramètre agence dans toutes les composantes + filtres erreurs supplémentaires GlobalErrorHandler' },
+    { date: '2026-02-27', impact: 'positive', summary: 'SMS de relance après abandon : délai 30 min → 5 min + génération short URL + middleware routing follow-up — rattrape utilisateurs engagés à chaud' },
+
+    // ─── Mar 2026 ─── Perfo, SEO, Twilio, refontes
+    { date: '2026-03-02', impact: 'positive', summary: 'Refonte UI estimation-coordonnees + ajout données travaux dans tunnel + fix erreurs extensions navigateur (injFunc) — propre et complet' },
+    { date: '2026-03-03', impact: 'positive', summary: 'Quick wins SEO : title/description optimisés, og:image, schemas JSON-LD, H1, noindex /conversion + perfo Core Web Vitals (cache headers, WebP, tree-shake Google Maps, defer GTM, code splitting)' },
+    { date: '2026-03-04', impact: 'neutral', summary: 'Conditional display "fourchette de valeur" sur ConversionHero selon paramètre agence (afficherFourchette + mettreEnAvantAgence)' },
+    { date: '2026-03-05', impact: 'positive', summary: 'Refactor Facebook tracking (sendFacebookEvent unifié) + IRIS code via GPS lookup + scheduling RDV configurable par agence — plus stable et flexible' },
+    { date: '2026-03-06', impact: 'positive', summary: 'Facebook Advanced Matching avec re-init manuelle des user data + système Google Ratings avec admin + redirection slugs agences + couleurs primaires dynamiques — meilleure qualité tracking pub' },
+    { date: '2026-03-10', impact: 'neutral', summary: 'Système de logs estimation côté serveur + page admin logs + migration agency location vers OpenCage Geocoding + "apartamento" → "piso" en ES' },
+    { date: '2026-03-11', impact: 'neutral', summary: 'Migration SMS OTP : CM.com → Twilio Verify (en test)' },
+    { date: '2026-03-12', impact: 'negative', summary: 'Code SMS verification : 6 → 4 chiffres (test) — modifie l\'UX de saisie du code, à rebasculer rapidement' },
+    { date: '2026-03-13', impact: 'negative', summary: 'Bascule Twilio Verify → Twilio SMS direct + retour à 5 chiffres + provider CM.com de nouveau pour SMS marketing — friction au moment critique de la vérification' },
+    { date: '2026-03-15', impact: 'positive', summary: 'Refonte tracking analytics : intégration sur toutes étapes estimation, suppression doublons useAnalytics, upsert au lieu de create (anti race conditions), ordre des étapes corrigé — bundle plus léger + données plus fiables' },
+    { date: '2026-03-16', impact: 'positive', summary: 'Polyfills MediaQueryList.addEventListener (anciens Safari) + nouveau tunnel estimer-loyer (location) + ajustements gradients UI' },
+    { date: '2026-03-19', impact: 'positive', summary: 'Refactor init agent : chargement plus fiable via liens SMS de relance (récupération uniqueId/agent depuis URL et localStorage)' },
+    { date: '2026-03-21', impact: 'neutral', summary: 'SEO multi-locale : meta tags dynamiques selon locale + redesign sélecteur de langue + traduction bulles par défaut selon locale + format tel Belgique' },
+    { date: '2026-03-24', impact: 'neutral', summary: 'Système de redirection slugs agences déplacé du middleware vers next.config.js + admin redirection management + paramètres vendeur (nom/email) configurables par agence' },
+    { date: '2026-03-25', impact: 'neutral', summary: 'Geocoding API route + filtre acquisitions 14 derniers jours' },
+    { date: '2026-03-27', impact: 'positive', summary: 'Streamline redirection adresse dans AskAddressPage + ConversionHero — moins de cas edge avec adresses partiellement reconnues' },
+    { date: '2026-03-30', impact: 'neutral', summary: 'Intégration tunnel location dans projet principal pour location.estimerlogement.fr + Google Maps Spanish localization + suppression validation regex adresse RDV ES + endpoint MALINE_API mis à jour' },
+    { date: '2026-03-31', impact: 'positive', summary: 'Audit SEO complet (105 villes, 10 guides, 28 sous-guides, schemas, comparateur, FAQ, OG image) + dashboard SEO admin avec KPIs et checklist mensuelle + corrections double header pages SEO + logo net dans header SEO' },
+
+    // ─── Avril 2026 ─── A/B testing complet + veille concurrentielle
+    { date: '2026-04-01', impact: 'positive', summary: 'Validation adresse douce : suppression blocage BAN strict du 23/10 + bouton bypass "Continuer quand même" + middleware admin auth + headers sécurité — corrige enfin la régression d\'octobre' },
+    { date: '2026-04-02', impact: 'positive', summary: 'Système A/B test HP : variant_b utilise BAN autocomplete + géoloc IP pour prioriser suggestions + tracking avec/sans numéro de rue + suggestions BAN complémentaires + admin avec verdicts statistiques (volume, confiance, p-value)' },
+    { date: '2026-04-03', impact: 'positive', summary: 'Page admin liste-estimations avec comparaison BDD V3 (PostgreSQL via tunnel SSH) + matching tel+date + filtres par plage de dates + détail conversions A/B test cliquable' },
+    { date: '2026-04-04', impact: 'positive', summary: '3 nouveaux A/B tests (CTA homepage, confiance tel, tunnel compact) + funnel par variante + segmentation device + dupliquer/modifier/archiver tests + A/B test animation-popup (durée animation projet vente) + filtres multi-select admin + retry loadTestsForPage si sessionId pas prêt + abréviations voies (Av., Bd., Chem.)' },
+    { date: '2026-04-05', impact: 'positive', summary: 'Variant_b validation-adresse devient le comportement par défaut (3 champs N°/Rue/CP+Ville) — résultat du test A/B' },
+    { date: '2026-04-07', impact: 'positive', summary: 'Variant_c cta-homepage devient le CTA par défaut ("VOIR LE PRIX DE MON BIEN") + segmentation mobile/desktop dans résultats des tests + persistance snapshots veille concurrentielle en SQLite' },
   ]
 
   // Données hebdomadaires pour les courbes de taux de conversion
@@ -405,7 +462,7 @@ function LeadsPage() {
     const MIN_WEEKLY_VISITORS = 200
     return Array.from(weekMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .filter(([weekStart, data]) => data.visitors >= MIN_WEEKLY_VISITORS && weekStart >= '2025-10-05')
+      .filter(([weekStart, data]) => data.visitors >= MIN_WEEKLY_VISITORS && weekStart >= '2025-09-29')
       .map(([weekStart, data]) => {
         const d = new Date(weekStart + 'T00:00:00')
         const endOfWeek = new Date(d)
