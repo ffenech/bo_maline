@@ -613,6 +613,98 @@ export async function getTodayVisitors(): Promise<RealtimeVisitors> {
   }
 }
 
+// Série quotidienne des visiteurs sur la HP + la page typologie
+// Permet de mesurer le taux de passage HP → début du formulaire
+export interface DailyFunnelEntry {
+  date: string
+  homepage: number
+  typology: number
+}
+
+const funnelStepsCachePath = path.join(process.cwd(), 'ga4-cache-funnel-steps-fr.json')
+
+async function fetchGA4DailyFunnelSteps(propertyId: string): Promise<DailyFunnelEntry[]> {
+  const client = await initGA4Client()
+  if (!client) throw new Error('Client GA4 non disponible')
+
+  console.log(`📊 [GA4] Récupération daily funnel HP→typologie (${propertyId})...`)
+
+  const [response] = await client.runReport({
+    property: `properties/${propertyId}`,
+    dateRanges: [{ startDate: '2024-09-14', endDate: 'today' }],
+    dimensions: [{ name: 'date' }, { name: 'pagePath' }],
+    metrics: [{ name: 'activeUsers' }],
+    dimensionFilter: {
+      orGroup: {
+        expressions: [
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: { matchType: 'EXACT' as const, value: '/', caseSensitive: false },
+            },
+          },
+          {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: { matchType: 'EXACT' as const, value: '/prix-m2/estimation-typologie', caseSensitive: false },
+            },
+          },
+        ],
+      },
+    },
+    limit: 100000,
+  })
+
+  const byDate = new Map<string, { homepage: number; typology: number }>()
+  if (response.rows) {
+    for (const row of response.rows) {
+      const dateStr = row.dimensionValues?.[0]?.value || ''
+      const pagePath = row.dimensionValues?.[1]?.value || ''
+      const users = parseInt(row.metricValues?.[0]?.value || '0')
+      const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
+      const entry = byDate.get(formattedDate) || { homepage: 0, typology: 0 }
+      if (pagePath === '/') entry.homepage += users
+      else if (pagePath === '/prix-m2/estimation-typologie') entry.typology += users
+      byDate.set(formattedDate, entry)
+    }
+  }
+
+  const result: DailyFunnelEntry[] = Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, homepage: v.homepage, typology: v.typology }))
+
+  console.log(`✅ [GA4] ${result.length} jours de funnel HP→typologie récupérés`)
+  return result
+}
+
+export async function getDailyFunnelHpToTypology(): Promise<DailyFunnelEntry[]> {
+  try {
+    const content = await fs.readFile(funnelStepsCachePath, 'utf-8')
+    const cache = JSON.parse(content) as { timestamp: number; data: DailyFunnelEntry[] }
+    if (Date.now() - cache.timestamp < CACHE_DURATION) {
+      console.log(`✅ Utilisation du cache funnel HP→typologie (age: ${Math.round((Date.now() - cache.timestamp) / 1000 / 60)} min)`)
+      return cache.data
+    }
+  } catch {}
+
+  try {
+    const data = await fetchGA4DailyFunnelSteps(propertyIdV2)
+    await fs.writeFile(funnelStepsCachePath, JSON.stringify({ timestamp: Date.now(), data }, null, 2))
+    console.log('💾 Cache funnel HP→typologie mis à jour')
+    return data
+  } catch (error) {
+    console.error('❌ Erreur GA4 funnel HP→typologie:', error)
+    try {
+      const content = await fs.readFile(funnelStepsCachePath, 'utf-8')
+      const cache = JSON.parse(content) as { timestamp: number; data: DailyFunnelEntry[] }
+      console.log('⚠️ Fallback sur cache expiré funnel HP→typologie')
+      return cache.data
+    } catch {
+      return []
+    }
+  }
+}
+
 // Obtenir les visiteurs quotidiens V2 filtrés par agences (rewrite) - OPTIMISÉ
 export async function getDailyVisitorsV2ByAgencies(agencyRewrites: string[]): Promise<DailyVisitors[]> {
   console.log(`🔍 [GA4] getDailyVisitorsV2ByAgencies appelé avec ${agencyRewrites.length} agences`)

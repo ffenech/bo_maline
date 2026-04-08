@@ -40,6 +40,7 @@ function LeadsPage() {
 
   const [visitors, setVisitors] = useState<VisitorData>({})
   const [visitorsEs, setVisitorsEs] = useState<VisitorData>({})
+  const [hpToTypology, setHpToTypology] = useState<Array<{ date: string; homepage: number; typology: number }>>([])
   const [remarks, setRemarks] = useState<RemarksData>({})
   const [clientCountFr, setClientCountFr] = useState<number>(0)
   const [clientCountEs, setClientCountEs] = useState<number>(0)
@@ -107,7 +108,8 @@ function LeadsPage() {
           visitorsData,
           visitorsEsData,
           remarksData,
-          clientLocalesData
+          clientLocalesData,
+          hpToTypologyData
         ] = await Promise.all([
           cachedFetch<DailyLead[]>(`${apiUrl}/leads/v2-daily`),
           cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/v2-daily-phone`),
@@ -116,7 +118,8 @@ function LeadsPage() {
           cachedFetch<VisitorData>(`${apiUrl}/ga4/daily-visitors-v2`),
           cachedFetch<any[]>(`${apiUrl}/ga4/daily-visitors-es`),
           cachedFetch<RemarksData>(`${apiUrl}/remarks`),
-          cachedFetch<any>(`${apiUrl}/pub-stats?period=30d`)
+          cachedFetch<any>(`${apiUrl}/pub-stats?period=30d`),
+          cachedFetch<Array<{ date: string; homepage: number; typology: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => [])
         ])
 
         // Traiter les leads (tous)
@@ -163,6 +166,7 @@ function LeadsPage() {
 
         setVisitors(visitorsMap)
         setVisitorsEs(visitorsEsMap)
+        setHpToTypology(Array.isArray(hpToTypologyData) ? hpToTypologyData : [])
 
         // Traiter les remarques
         setRemarks(remarksData || {})
@@ -484,6 +488,51 @@ function LeadsPage() {
         }
       })
   }, [currentDailyLeads, currentDailyPhoneStats, currentVisitors])
+
+  // Données hebdomadaires HP → typologie (mesure l'impact de la validation d'adresse)
+  const weeklyHpToTypologyData = useMemo(() => {
+    if (!hpToTypology.length) return []
+    const now = new Date()
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const weekMap = new Map<string, { homepage: number; typology: number }>()
+    hpToTypology.forEach(day => {
+      const dateKey = day.date.split('T')[0]
+      if (dateKey === todayKey) return
+      const d = new Date(dateKey + 'T00:00:00')
+      const dayOfWeek = d.getDay()
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+      const monday = new Date(d)
+      monday.setDate(d.getDate() + mondayOffset)
+      const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
+      const existing = weekMap.get(weekKey) || { homepage: 0, typology: 0 }
+      existing.homepage += day.homepage
+      existing.typology += day.typology
+      weekMap.set(weekKey, existing)
+    })
+
+    return Array.from(weekMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .filter(([weekStart, data]) => data.homepage >= 200 && weekStart >= '2025-09-29')
+      .map(([weekStart, data]) => {
+        const d = new Date(weekStart + 'T00:00:00')
+        const endOfWeek = new Date(d)
+        endOfWeek.setDate(d.getDate() + 6)
+        const weekEndKey = `${endOfWeek.getFullYear()}-${String(endOfWeek.getMonth() + 1).padStart(2, '0')}-${String(endOfWeek.getDate()).padStart(2, '0')}`
+        const label = `${endOfWeek.getDate()}/${endOfWeek.getMonth() + 1}`
+        const startLabel = `${d.getDate()}/${d.getMonth() + 1}`
+        const weekCommits = siteCommits.filter(c => c.date >= weekStart && c.date <= weekEndKey)
+        return {
+          week: label,
+          weekStart,
+          weekEnd: weekEndKey,
+          weekRangeLabel: `${startLabel} → ${label}`,
+          homepage: data.homepage,
+          typology: data.typology,
+          tauxHpToTypology: data.homepage > 0 ? parseFloat(((data.typology / data.homepage) * 100).toFixed(2)) : 0,
+          commits: weekCommits,
+        }
+      })
+  }, [hpToTypology])
 
   // Fonction pour détecter le type d'anomalie (> 1 écart-type)
   const getAnomalyType = (rate: number): 'normal' | 'low' | 'high' => {
@@ -1072,6 +1121,25 @@ function LeadsPage() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+          {weeklyHpToTypologyData.length > 1 && (
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Taux HP → Typologie (hebdo)</h3>
+              <p className="text-xs text-gray-500 mb-4">Pourcentage des visiteurs arrivés sur la HP qui atteignent la page typologie (début du formulaire). Mesure l'impact de l'étape validation d'adresse.</p>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={weeklyHpToTypologyData} margin={{ top: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
+                  <Tooltip content={<CommitTooltip dataKey="tauxHpToTypology" />} />
+                  {weeklyHpToTypologyData.filter(w => w.commits.length > 0).map(w => {
+                    const mainImpact = w.commits.find(c => c.impact !== 'neutral')?.impact || 'neutral'
+                    return <ReferenceLine key={w.week} x={w.week} stroke={impactColor(mainImpact)} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  })}
+                  <Line type="monotone" dataKey="tauxHpToTypology" stroke="#10b981" strokeWidth={2} dot={<CommitDot stroke="#10b981" />} activeDot={{ r: 5 }} name="HP → Typologie" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
           {/* Légende des annotations */}
           <div className="lg:col-span-2 flex items-center gap-6 text-xs text-gray-500 px-2">
             <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-green-600"></span> Commit positif pour la conversion</span>
