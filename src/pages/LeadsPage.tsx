@@ -40,7 +40,7 @@ function LeadsPage() {
 
   const [visitors, setVisitors] = useState<VisitorData>({})
   const [visitorsEs, setVisitorsEs] = useState<VisitorData>({})
-  const [hpToTypology, setHpToTypology] = useState<Array<{ date: string; homepage: number; typology: number }>>([])
+  const [hpToTypology, setHpToTypology] = useState<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>([])
   const [remarks, setRemarks] = useState<RemarksData>({})
   const [clientCountFr, setClientCountFr] = useState<number>(0)
   const [clientCountEs, setClientCountEs] = useState<number>(0)
@@ -119,7 +119,7 @@ function LeadsPage() {
           cachedFetch<any[]>(`${apiUrl}/ga4/daily-visitors-es`),
           cachedFetch<RemarksData>(`${apiUrl}/remarks`),
           cachedFetch<any>(`${apiUrl}/pub-stats?period=30d`),
-          cachedFetch<Array<{ date: string; homepage: number; typology: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => [])
+          cachedFetch<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => [])
         ])
 
         // Traiter les leads (tous)
@@ -489,12 +489,13 @@ function LeadsPage() {
       })
   }, [currentDailyLeads, currentDailyPhoneStats, currentVisitors])
 
-  // Données hebdomadaires HP → typologie (mesure l'impact de la validation d'adresse)
+  // Données hebdomadaires des étapes du tunnel
   const weeklyHpToTypologyData = useMemo(() => {
     if (!hpToTypology.length) return []
     const now = new Date()
     const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const weekMap = new Map<string, { homepage: number; typology: number }>()
+    type WeekAgg = { homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }
+    const weekMap = new Map<string, WeekAgg>()
     hpToTypology.forEach(day => {
       const dateKey = day.date.split('T')[0]
       if (dateKey === todayKey) return
@@ -504,9 +505,12 @@ function LeadsPage() {
       const monday = new Date(d)
       monday.setDate(d.getDate() + mondayOffset)
       const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
-      const existing = weekMap.get(weekKey) || { homepage: 0, typology: 0 }
-      existing.homepage += day.homepage
-      existing.typology += day.typology
+      const existing: WeekAgg = weekMap.get(weekKey) || { homepage: 0, typology: 0, coordonnees: 0, telephone: 0, verificationSms: 0 }
+      existing.homepage += day.homepage || 0
+      existing.typology += day.typology || 0
+      existing.coordonnees += day.coordonnees || 0
+      existing.telephone += day.telephone || 0
+      existing.verificationSms += day.verificationSms || 0
       weekMap.set(weekKey, existing)
     })
 
@@ -528,7 +532,14 @@ function LeadsPage() {
           weekRangeLabel: `${startLabel} → ${label}`,
           homepage: data.homepage,
           typology: data.typology,
+          coordonnees: data.coordonnees,
+          telephone: data.telephone,
+          verificationSms: data.verificationSms,
           tauxHpToTypology: data.homepage > 0 ? parseFloat(((data.typology / data.homepage) * 100).toFixed(2)) : 0,
+          tauxTypoToTel: data.typology > 0 ? parseFloat(((data.telephone / data.typology) * 100).toFixed(2)) : 0,
+          tauxTypoToCoord: data.typology > 0 ? parseFloat(((data.coordonnees / data.typology) * 100).toFixed(2)) : 0,
+          tauxCoordToTel: data.coordonnees > 0 ? parseFloat(((data.telephone / data.coordonnees) * 100).toFixed(2)) : 0,
+          tauxTelToSms: data.telephone > 0 ? parseFloat(((data.verificationSms / data.telephone) * 100).toFixed(2)) : 0,
           commits: weekCommits,
         }
       })
@@ -1121,25 +1132,34 @@ function LeadsPage() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {weeklyHpToTypologyData.length > 1 && (
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Taux HP → Typologie (hebdo)</h3>
-              <p className="text-xs text-gray-500 mb-4">Pourcentage des visiteurs arrivés sur la HP qui atteignent la page typologie (début du formulaire). Mesure l'impact de l'étape validation d'adresse.</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={weeklyHpToTypologyData} margin={{ top: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
-                  <Tooltip content={<CommitTooltip dataKey="tauxHpToTypology" />} />
-                  {weeklyHpToTypologyData.filter(w => w.commits.length > 0).map(w => {
-                    const mainImpact = w.commits.find(c => c.impact !== 'neutral')?.impact || 'neutral'
-                    return <ReferenceLine key={w.week} x={w.week} stroke={impactColor(mainImpact)} strokeDasharray="3 3" strokeOpacity={0.5} />
-                  })}
-                  <Line type="monotone" dataKey="tauxHpToTypology" stroke="#10b981" strokeWidth={2} dot={<CommitDot stroke="#10b981" />} activeDot={{ r: 5 }} name="HP → Typologie" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          {weeklyHpToTypologyData.length > 1 && (() => {
+            const funnelWeeksWithCommits = weeklyHpToTypologyData.filter(w => w.commits.length > 0)
+            const funnelCharts = [
+              { key: 'tauxHpToTypology', title: 'HP → Typologie', desc: 'Mesure l\'impact de la validation d\'adresse', stroke: '#10b981' },
+              { key: 'tauxTypoToCoord', title: 'Typologie → Coordonnées', desc: 'Mesure les étapes intermédiaires (surface, rénovation, caractéristiques, etc.)', stroke: '#0ea5e9' },
+              { key: 'tauxCoordToTel', title: 'Coordonnées → Téléphone', desc: 'Mesure le passage entre saisie email/nom et numéro de téléphone', stroke: '#f59e0b' },
+              { key: 'tauxTelToSms', title: 'Téléphone → Vérification SMS', desc: 'Mesure le taux d\'envoi du SMS et de saisie du code', stroke: '#a855f7' },
+            ]
+            return funnelCharts.map(({ key, title, desc, stroke }) => (
+              <div key={key} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">{title} (hebdo)</h3>
+                <p className="text-xs text-gray-500 mb-4">{desc}</p>
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={weeklyHpToTypologyData} margin={{ top: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
+                    <Tooltip content={<CommitTooltip dataKey={key} />} />
+                    {funnelWeeksWithCommits.map(w => {
+                      const mainImpact = w.commits.find(c => c.impact !== 'neutral')?.impact || 'neutral'
+                      return <ReferenceLine key={w.week} x={w.week} stroke={impactColor(mainImpact)} strokeDasharray="3 3" strokeOpacity={0.5} />
+                    })}
+                    <Line type="monotone" dataKey={key} stroke={stroke} strokeWidth={2} dot={<CommitDot stroke={stroke} />} activeDot={{ r: 5 }} name={title} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ))
+          })()}
           {/* Légende des annotations */}
           <div className="lg:col-span-2 flex items-center gap-6 text-xs text-gray-500 px-2">
             <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-green-600"></span> Commit positif pour la conversion</span>

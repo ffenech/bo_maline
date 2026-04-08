@@ -613,12 +613,23 @@ export async function getTodayVisitors(): Promise<RealtimeVisitors> {
   }
 }
 
-// Série quotidienne des visiteurs sur la HP + la page typologie
-// Permet de mesurer le taux de passage HP → début du formulaire
+// Série quotidienne des visiteurs sur les pages clés du tunnel
+// Permet de mesurer plusieurs taux de passage à la fois
 export interface DailyFunnelEntry {
   date: string
   homepage: number
   typology: number
+  coordonnees: number
+  telephone: number
+  verificationSms: number
+}
+
+const FUNNEL_TRACKED_PATHS: Record<string, keyof Omit<DailyFunnelEntry, 'date'>> = {
+  '/': 'homepage',
+  '/prix-m2/estimation-typologie': 'typology',
+  '/prix-m2/estimation-coordonnees': 'coordonnees',
+  '/prix-m2/estimation-telephone': 'telephone',
+  '/prix-m2/verification-sms': 'verificationSms',
 }
 
 const funnelStepsCachePath = path.join(process.cwd(), 'ga4-cache-funnel-steps-fr.json')
@@ -627,7 +638,7 @@ async function fetchGA4DailyFunnelSteps(propertyId: string): Promise<DailyFunnel
   const client = await initGA4Client()
   if (!client) throw new Error('Client GA4 non disponible')
 
-  console.log(`📊 [GA4] Récupération daily funnel HP→typologie (${propertyId})...`)
+  console.log(`📊 [GA4] Récupération daily funnel multi-étapes (${propertyId})...`)
 
   const [response] = await client.runReport({
     property: `properties/${propertyId}`,
@@ -636,44 +647,37 @@ async function fetchGA4DailyFunnelSteps(propertyId: string): Promise<DailyFunnel
     metrics: [{ name: 'activeUsers' }],
     dimensionFilter: {
       orGroup: {
-        expressions: [
-          {
-            filter: {
-              fieldName: 'pagePath',
-              stringFilter: { matchType: 'EXACT' as const, value: '/', caseSensitive: false },
-            },
+        expressions: Object.keys(FUNNEL_TRACKED_PATHS).map(p => ({
+          filter: {
+            fieldName: 'pagePath',
+            stringFilter: { matchType: 'EXACT' as const, value: p, caseSensitive: false },
           },
-          {
-            filter: {
-              fieldName: 'pagePath',
-              stringFilter: { matchType: 'EXACT' as const, value: '/prix-m2/estimation-typologie', caseSensitive: false },
-            },
-          },
-        ],
+        })),
       },
     },
-    limit: 100000,
+    limit: 200000,
   })
 
-  const byDate = new Map<string, { homepage: number; typology: number }>()
+  const empty = (): Omit<DailyFunnelEntry, 'date'> => ({ homepage: 0, typology: 0, coordonnees: 0, telephone: 0, verificationSms: 0 })
+  const byDate = new Map<string, Omit<DailyFunnelEntry, 'date'>>()
   if (response.rows) {
     for (const row of response.rows) {
       const dateStr = row.dimensionValues?.[0]?.value || ''
       const pagePath = row.dimensionValues?.[1]?.value || ''
       const users = parseInt(row.metricValues?.[0]?.value || '0')
       const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
-      const entry = byDate.get(formattedDate) || { homepage: 0, typology: 0 }
-      if (pagePath === '/') entry.homepage += users
-      else if (pagePath === '/prix-m2/estimation-typologie') entry.typology += users
+      const entry = byDate.get(formattedDate) || empty()
+      const key = FUNNEL_TRACKED_PATHS[pagePath]
+      if (key) entry[key] += users
       byDate.set(formattedDate, entry)
     }
   }
 
   const result: DailyFunnelEntry[] = Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, homepage: v.homepage, typology: v.typology }))
+    .map(([date, v]) => ({ date, ...v }))
 
-  console.log(`✅ [GA4] ${result.length} jours de funnel HP→typologie récupérés`)
+  console.log(`✅ [GA4] ${result.length} jours de funnel multi-étapes récupérés`)
   return result
 }
 
