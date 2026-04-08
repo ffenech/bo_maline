@@ -1038,6 +1038,78 @@ app.get('/api/leads/v2-daily-phone', async (req, res) => {
   }
 })
 
+// ─── BDD V2 (MySQL bien_immobilier) — daily leads ───
+// Onglet "BDD V2" de la page leads. Mesure ce qui est effectivement arrivé dans
+// bien_immobilier (le backoffice intermédiaire entre estimateur et V3).
+// Permet de comparer avec V3 pour détecter les pertes de sync.
+app.get('/api/leads/bdd-v2-daily', async (req, res) => {
+  try {
+    const cacheKey = 'leads-bdd-v2-daily'
+    const cached = getCached<any>(cacheKey)
+    if (cached) return res.json(cached)
+
+    const pool = getMysqlPool()
+    // Vendeurs = tout sauf "Pas de projet de Vente" et "Projet de location"
+    // Source estimateur = estimation_id non vide
+    const [rows] = await pool.query(`
+      SELECT DATE(date_acquisition) as date, COUNT(*) as total_leads
+      FROM bien_immobilier
+      WHERE date_acquisition >= '2024-09-14'
+        AND estimation_id IS NOT NULL AND estimation_id != ''
+        AND vente_prevue IS NOT NULL
+        AND vente_prevue NOT IN ('Pas de projet de Vente', 'Projet de location', '')
+      GROUP BY DATE(date_acquisition)
+      ORDER BY DATE(date_acquisition) ASC
+    `) as any
+    const result = rows.map((r: any) => ({
+      date: typeof r.date === 'string' ? r.date.slice(0, 10) : new Date(r.date).toISOString().slice(0, 10),
+      total_leads: Number(r.total_leads) || 0,
+    }))
+    setCache(cacheKey, result)
+    res.json(result)
+  } catch (error) {
+    console.error('Erreur lors de la récupération BDD V2 daily:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// BDD V2 daily phone stats — autant que possible depuis bien_immobilier
+// Note: bien_immobilier a sms_envoye (envoyé) mais pas de champ explicite "validated phone".
+// On retourne le même format que v2-daily-phone pour compatibilité avec le frontend.
+app.get('/api/leads/bdd-v2-daily-phone', async (req, res) => {
+  try {
+    const cacheKey = 'leads-bdd-v2-daily-phone'
+    const cached = getCached<any>(cacheKey)
+    if (cached) return res.json(cached)
+
+    const pool = getMysqlPool()
+    // Proxy pour "leads_with_phone" = rows où contact existe avec un tel (via contact44 ? via vendeur_no_tel = 0 ?)
+    // Proxy pour "leads_with_validated_phone" = rows où sms_envoye = 1 (SMS OTP envoyé = tel validé en amont)
+    const [rows] = await pool.query(`
+      SELECT DATE(date_acquisition) as date,
+             SUM(CASE WHEN (vendeur_no_tel = 0 OR vendeur_no_tel IS NULL) THEN 1 ELSE 0 END) as leads_with_phone,
+             SUM(CASE WHEN sms_envoye = 1 THEN 1 ELSE 0 END) as leads_with_validated_phone
+      FROM bien_immobilier
+      WHERE date_acquisition >= '2024-09-14'
+        AND estimation_id IS NOT NULL AND estimation_id != ''
+        AND vente_prevue IS NOT NULL
+        AND vente_prevue NOT IN ('Pas de projet de Vente', 'Projet de location', '')
+      GROUP BY DATE(date_acquisition)
+      ORDER BY DATE(date_acquisition) ASC
+    `) as any
+    const result = rows.map((r: any) => ({
+      date: typeof r.date === 'string' ? r.date.slice(0, 10) : new Date(r.date).toISOString().slice(0, 10),
+      leads_with_phone: Number(r.leads_with_phone) || 0,
+      leads_with_validated_phone: Number(r.leads_with_validated_phone) || 0,
+    }))
+    setCache(cacheKey, result)
+    res.json(result)
+  } catch (error) {
+    console.error('Erreur lors de la récupération BDD V2 daily phone:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Récupérer les leads quotidiens V2 filtrés par agences
 app.get('/api/leads/v2-daily-filtered', async (req, res) => {
   try {

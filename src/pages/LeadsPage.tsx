@@ -25,7 +25,7 @@ interface RemarksData {
   [date: string]: string
 }
 
-type TabType = 'all' | 'fr' | 'es' | 'v1' | 'integrity'
+type TabType = 'all' | 'fr' | 'es' | 'bdd-v2' | 'v1' | 'integrity'
 
 function LeadsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('all')
@@ -37,6 +37,10 @@ function LeadsPage() {
   // Données pour les clients espagnols
   const [dailyLeadsEs, setDailyLeadsEs] = useState<DailyLead[]>([])
   const [dailyPhoneStatsEs, setDailyPhoneStatsEs] = useState<DailyPhoneStats[]>([])
+
+  // Données BDD V2 (MySQL bien_immobilier)
+  const [dailyLeadsBddV2, setDailyLeadsBddV2] = useState<DailyLead[]>([])
+  const [dailyPhoneStatsBddV2, setDailyPhoneStatsBddV2] = useState<DailyPhoneStats[]>([])
 
   const [visitors, setVisitors] = useState<VisitorData>({})
   const [visitorsEs, setVisitorsEs] = useState<VisitorData>({})
@@ -78,8 +82,8 @@ function LeadsPage() {
   }, [visitors, visitorsEs])
 
   // Sélectionner les données selon l'onglet actif
-  const currentDailyLeads = activeTab === 'es' ? dailyLeadsEs : activeTab === 'fr' ? dailyLeadsFr : dailyLeads
-  const currentDailyPhoneStats = activeTab === 'es' ? dailyPhoneStatsEs : activeTab === 'fr' ? dailyPhoneStatsFr : dailyPhoneStats
+  const currentDailyLeads = activeTab === 'es' ? dailyLeadsEs : activeTab === 'fr' ? dailyLeadsFr : activeTab === 'bdd-v2' ? dailyLeadsBddV2 : dailyLeads
+  const currentDailyPhoneStats = activeTab === 'es' ? dailyPhoneStatsEs : activeTab === 'fr' ? dailyPhoneStatsFr : activeTab === 'bdd-v2' ? dailyPhoneStatsBddV2 : dailyPhoneStats
   const currentVisitors = activeTab === 'es' ? visitorsEs : activeTab === 'fr' ? visitorsFr : visitors
 
   useEffect(() => {
@@ -109,7 +113,9 @@ function LeadsPage() {
           visitorsEsData,
           remarksData,
           clientLocalesData,
-          hpToTypologyData
+          hpToTypologyData,
+          leadsBddV2Data,
+          phoneBddV2Data
         ] = await Promise.all([
           cachedFetch<DailyLead[]>(`${apiUrl}/leads/v2-daily`),
           cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/v2-daily-phone`),
@@ -119,7 +125,9 @@ function LeadsPage() {
           cachedFetch<any[]>(`${apiUrl}/ga4/daily-visitors-es`),
           cachedFetch<RemarksData>(`${apiUrl}/remarks`),
           cachedFetch<any>(`${apiUrl}/pub-stats?period=30d`),
-          cachedFetch<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => [])
+          cachedFetch<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => []),
+          cachedFetch<DailyLead[]>(`${apiUrl}/leads/bdd-v2-daily`).catch(() => []),
+          cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/bdd-v2-daily-phone`).catch(() => [])
         ])
 
         // Traiter les leads (tous)
@@ -133,6 +141,10 @@ function LeadsPage() {
 
         // Traiter les statistiques téléphone espagnols
         setDailyPhoneStatsEs(filterByDate(phoneEsData || []).reverse())
+
+        // Traiter les données BDD V2 (bien_immobilier)
+        setDailyLeadsBddV2(filterByDate(leadsBddV2Data || []).reverse())
+        setDailyPhoneStatsBddV2(filterByDate(phoneBddV2Data || []).reverse())
 
         // Traiter les visiteurs GA4 (tous)
         const visitorsMap: VisitorData = {}
@@ -601,6 +613,16 @@ function LeadsPage() {
             Espagne ({clientCountEs})
           </button>
           <button
+            onClick={() => setActiveTab('bdd-v2')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'bdd-v2'
+                ? 'border-purple-500 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            BDD V2
+          </button>
+          <button
             onClick={() => setActiveTab('v1')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'v1'
@@ -751,7 +773,7 @@ function LeadsPage() {
       {/* Tableau */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Détail journalier {activeTab === 'es' ? '- Espagne' : activeTab === 'fr' ? '- France' : ''}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Détail journalier {activeTab === 'es' ? '- Espagne' : activeTab === 'fr' ? '- France' : activeTab === 'bdd-v2' ? '- BDD V2 (bien_immobilier)' : ''}</h3>
         </div>
         <div className="overflow-x-auto max-w-full">
           <div className="inline-block min-w-full align-middle">
@@ -773,7 +795,7 @@ function LeadsPage() {
               {currentDailyLeads.length === 0 ? (
                 <tr>
                   <td colSpan={currentDailyLeads.length + 1} className="px-6 py-8 text-center text-gray-500">
-                    Aucun lead trouvé {activeTab === 'es' ? 'pour les clients espagnols' : activeTab === 'fr' ? 'pour les clients français' : 'pour les comptes Estimateur V2'} depuis le 1er septembre
+                    Aucun lead trouvé {activeTab === 'es' ? 'pour les clients espagnols' : activeTab === 'fr' ? 'pour les clients français' : activeTab === 'bdd-v2' ? 'dans bien_immobilier (BDD V2)' : 'pour les comptes Estimateur V2'} depuis le 1er septembre
                   </td>
                 </tr>
               ) : (
