@@ -149,7 +149,41 @@ function generateCandidateDbNames(initialName: string): string[] {
   return candidates
 }
 
+const REMOTE_DB_CONFIG_PATH = '/home/maline/services/volpi/project/backofficepub/back/public/assets/db-config.json'
+
+function fetchRemoteDbName(): string | null {
+  try {
+    const raw = execSync(
+      `ssh -i ${process.env.SSH_KEY_PATH || '/tmp/bo_integrity_key_dec'} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${process.env.AWS_USER || 'root'}@${process.env.AWS_HOST || 'antone.maline-immobilier.fr'} cat ${REMOTE_DB_CONFIG_PATH} 2>/dev/null`,
+      { encoding: 'utf8', timeout: 15000 }
+    ).trim()
+    const config = JSON.parse(raw)
+    if (config.database && typeof config.database === 'string') {
+      console.log(`📡 DB_NAME récupéré depuis le serveur distant: ${config.database}`)
+      return config.database
+    }
+  } catch (err) {
+    console.warn('⚠️  Impossible de récupérer db-config.json distant:', (err as Error).message)
+  }
+  return null
+}
+
 async function findWorkingDatabase(): Promise<{ pool: Pool; dbName: string }> {
+  // 1) Essayer de récupérer le nom depuis le fichier distant (mis à jour à chaque MEP)
+  const remoteName = fetchRemoteDbName()
+  if (remoteName) {
+    try {
+      console.log(`🔄 Test de connexion sur la base distante "${remoteName}"...`)
+      const pool = await tryCreatePool(remoteName)
+      console.log(`✅ Connexion réussie sur "${remoteName}"`)
+      await persistDatabaseName(remoteName)
+      return { pool, dbName: remoteName }
+    } catch (error) {
+      console.warn(`⚠️  Base distante "${remoteName}" inaccessible, fallback sur DB_NAME local`)
+    }
+  }
+
+  // 2) Fallback : incrémenter à partir du DB_NAME du .env
   const initialName = process.env.DB_NAME
 
   if (!initialName) {
