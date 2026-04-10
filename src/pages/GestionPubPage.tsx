@@ -3290,7 +3290,7 @@ function GestionPubPage() {
                             <span>Marge <strong className="text-emerald-600">+{e.margePct?.toFixed(0)}%</strong></span>
                             {e.client.cpl_12m !== null && <span>12m <strong className="text-gray-800">{e.client.cpl_12m.toFixed(0)}€</strong></span>}
                             <span className="text-gray-400">|</span>
-                            <span>Dépensé/j <strong className={spendPerDay > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
+                            <span>Dépensé/j <strong className={(configuredDailyBudget > 0 ? configuredDailyBudget : spendPerDay) > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
                             <span>Max/j <strong className="text-gray-800">{budgetPubMaxJour.toFixed(1)}€</strong></span>
                           </div>
                         </div>
@@ -3324,7 +3324,7 @@ function GestionPubPage() {
                             {e.margePct !== null && <span>Marge <strong className="text-emerald-600">{e.margePct > 0 ? '+' : ''}{e.margePct.toFixed(0)}%</strong></span>}
                             {e.client.cpl_12m !== null && <span>12m <strong className="text-gray-800">{e.client.cpl_12m.toFixed(0)}€</strong></span>}
                             <span className="text-gray-400">|</span>
-                            <span>Dépensé/j <strong className={spendPerDay > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
+                            <span>Dépensé/j <strong className={(configuredDailyBudget > 0 ? configuredDailyBudget : spendPerDay) > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
                             <span>Max/j <strong className="text-gray-800">{budgetPubMaxJour.toFixed(1)}€</strong></span>
                           </div>
                         </div>
@@ -3358,7 +3358,7 @@ function GestionPubPage() {
                             <span>Marge <strong className="text-amber-600">{e.margePct?.toFixed(0)}%</strong></span>
                             {e.client.cpl_12m !== null && <span>12m <strong className="text-gray-800">{e.client.cpl_12m.toFixed(0)}€</strong></span>}
                             <span className="text-gray-400">|</span>
-                            <span>Dépensé/j <strong className={spendPerDay > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
+                            <span>Dépensé/j <strong className={(configuredDailyBudget > 0 ? configuredDailyBudget : spendPerDay) > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
                             <span>Max/j <strong className="text-gray-800">{budgetPubMaxJour.toFixed(1)}€</strong></span>
                           </div>
                         </div>
@@ -3393,7 +3393,7 @@ function GestionPubPage() {
                               {e.margePct !== null && <span>Marge <strong className="text-emerald-600">{e.margePct > 0 ? '+' : ''}{e.margePct.toFixed(0)}%</strong></span>}
                               {e.client.cpl_12m !== null && <span>12m <strong className="text-gray-800">{e.client.cpl_12m.toFixed(0)}€</strong></span>}
                               <span className="text-gray-400">|</span>
-                              <span>Dépensé/j <strong className={spendPerDay > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
+                              <span>Dépensé/j <strong className={(configuredDailyBudget > 0 ? configuredDailyBudget : spendPerDay) > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
                               <span>Max/j <strong className="text-gray-800">{budgetPubMaxJour.toFixed(1)}€</strong></span>
                             </div>
                           </div>
@@ -3445,7 +3445,7 @@ function GestionPubPage() {
                             {e.margePct !== null && <span>Marge <strong className="text-emerald-600">{e.margePct > 0 ? '+' : ''}{e.margePct.toFixed(0)}%</strong></span>}
                             {e.client.cpl_12m !== null && <span>12m <strong className="text-gray-800">{e.client.cpl_12m.toFixed(0)}€</strong></span>}
                             <span className="text-gray-400">|</span>
-                            <span>Dépensé/j <strong className={spendPerDay > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
+                            <span>Dépensé/j <strong className={(configuredDailyBudget > 0 ? configuredDailyBudget : spendPerDay) > budgetPubMaxJour ? 'text-red-600' : 'text-blue-600'}>{spendPerDay.toFixed(1)}€</strong>{configuredDailyBudget > 0 && <>/<strong className="text-gray-800">{configuredDailyBudget.toFixed(1)}€</strong></>}</span>
                             <span>Max/j <strong className="text-gray-800">{budgetPubMaxJour.toFixed(1)}€</strong></span>
                           </div>
                         </div>
