@@ -45,6 +45,7 @@ function LeadsPage() {
   const [visitors, setVisitors] = useState<VisitorData>({})
   const [visitorsEs, setVisitorsEs] = useState<VisitorData>({})
   const [hpToTypology, setHpToTypology] = useState<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>([])
+  const [hpToTypologyEs, setHpToTypologyEs] = useState<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>([])
   const [remarks, setRemarks] = useState<RemarksData>({})
   const [clientCountFr, setClientCountFr] = useState<number>(0)
   const [clientCountEs, setClientCountEs] = useState<number>(0)
@@ -115,7 +116,8 @@ function LeadsPage() {
           clientLocalesData,
           hpToTypologyData,
           leadsBddV2Data,
-          phoneBddV2Data
+          phoneBddV2Data,
+          hpToTypologyEsData
         ] = await Promise.all([
           cachedFetch<DailyLead[]>(`${apiUrl}/leads/v2-daily`),
           cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/v2-daily-phone`),
@@ -127,7 +129,8 @@ function LeadsPage() {
           cachedFetch<any>(`${apiUrl}/pub-stats?period=30d`),
           cachedFetch<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>(`${apiUrl}/ga4/daily-hp-to-typology`).catch(() => []),
           cachedFetch<DailyLead[]>(`${apiUrl}/leads/bdd-v2-daily`).catch(() => []),
-          cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/bdd-v2-daily-phone`).catch(() => [])
+          cachedFetch<DailyPhoneStats[]>(`${apiUrl}/leads/bdd-v2-daily-phone`).catch(() => []),
+          cachedFetch<Array<{ date: string; homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }>>(`${apiUrl}/ga4/daily-hp-to-typology-es`).catch(() => [])
         ])
 
         // Traiter les leads (tous)
@@ -179,6 +182,7 @@ function LeadsPage() {
         setVisitors(visitorsMap)
         setVisitorsEs(visitorsEsMap)
         setHpToTypology(Array.isArray(hpToTypologyData) ? hpToTypologyData : [])
+        setHpToTypologyEs(Array.isArray(hpToTypologyEsData) ? hpToTypologyEsData : [])
 
         // Traiter les remarques
         setRemarks(remarksData || {})
@@ -502,13 +506,14 @@ function LeadsPage() {
   }, [currentDailyLeads, currentDailyPhoneStats, currentVisitors])
 
   // Données hebdomadaires des étapes du tunnel
+  const currentHpToTypology = activeTab === 'es' ? hpToTypologyEs : hpToTypology
   const weeklyHpToTypologyData = useMemo(() => {
-    if (!hpToTypology.length) return []
+    if (!currentHpToTypology.length) return []
     const now = new Date()
     const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     type WeekAgg = { homepage: number; typology: number; coordonnees: number; telephone: number; verificationSms: number }
     const weekMap = new Map<string, WeekAgg>()
-    hpToTypology.forEach(day => {
+    currentHpToTypology.forEach(day => {
       const dateKey = day.date.split('T')[0]
       if (dateKey === todayKey) return
       const d = new Date(dateKey + 'T00:00:00')
@@ -555,7 +560,7 @@ function LeadsPage() {
           commits: weekCommits,
         }
       })
-  }, [hpToTypology])
+  }, [currentHpToTypology])
 
   // Fonction pour détecter le type d'anomalie (> 1 écart-type)
   const getAnomalyType = (rate: number): 'normal' | 'low' | 'high' => {

@@ -8,7 +8,7 @@ import { execSync } from 'node:child_process'
 import { Pool, type PoolConfig } from 'pg'
 import mysql from 'mysql2/promise'
 import { createSSHTunnel, closeSSHTunnel, setOnTunnelDied } from './ssh-tunnel.js'
-import { getDailyVisitorsV2, getDailyVisitorsV1, getDailyVisitorsEs, getConversionFunnel, getTodayVisitors, getDailyFunnelHpToTypology } from './ga4-analytics.js'
+import { getDailyVisitorsV2, getDailyVisitorsV1, getDailyVisitorsEs, getConversionFunnel, getTodayVisitors, getDailyFunnelHpToTypology, getDailyFunnelHpToTypologyEs } from './ga4-analytics.js'
 import {
   getAuthUrl,
   exchangeCodeForToken,
@@ -1678,6 +1678,22 @@ app.get('/api/ga4/daily-hp-to-typology', async (req, res) => {
     res.json(data)
   } catch (error) {
     console.error('Erreur lors de la récupération HP→typologie:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Série quotidienne HP → typologie pour le site ES (valorar-vivienda.es)
+app.get('/api/ga4/daily-hp-to-typology-es', async (req, res) => {
+  try {
+    const cacheKey = 'ga4-daily-hp-to-typology-es'
+    const cached = getCached<any>(cacheKey)
+    if (cached) return res.json(cached)
+
+    const data = await getDailyFunnelHpToTypologyEs()
+    setCache(cacheKey, data)
+    res.json(data)
+  } catch (error) {
+    console.error('Erreur lors de la récupération HP→typologie ES:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

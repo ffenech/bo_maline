@@ -633,6 +633,7 @@ const FUNNEL_TRACKED_PATHS: Record<string, keyof Omit<DailyFunnelEntry, 'date'>>
 }
 
 const funnelStepsCachePath = path.join(process.cwd(), 'ga4-cache-funnel-steps-fr.json')
+const funnelStepsCachePathEs = path.join(process.cwd(), 'ga4-cache-funnel-steps-es.json')
 
 async function fetchGA4DailyFunnelSteps(propertyId: string): Promise<DailyFunnelEntry[]> {
   const client = await initGA4Client()
@@ -681,32 +682,44 @@ async function fetchGA4DailyFunnelSteps(propertyId: string): Promise<DailyFunnel
   return result
 }
 
-export async function getDailyFunnelHpToTypology(): Promise<DailyFunnelEntry[]> {
+async function getDailyFunnelHpToTypologyFor(country: 'fr' | 'es'): Promise<DailyFunnelEntry[]> {
+  const propertyId = country === 'es' ? propertyIdEs : propertyIdV2
+  const cachePath = country === 'es' ? funnelStepsCachePathEs : funnelStepsCachePath
+  const label = country === 'es' ? 'HP→typologie ES' : 'HP→typologie'
+
   try {
-    const content = await fs.readFile(funnelStepsCachePath, 'utf-8')
+    const content = await fs.readFile(cachePath, 'utf-8')
     const cache = JSON.parse(content) as { timestamp: number; data: DailyFunnelEntry[] }
     if (Date.now() - cache.timestamp < CACHE_DURATION) {
-      console.log(`✅ Utilisation du cache funnel HP→typologie (age: ${Math.round((Date.now() - cache.timestamp) / 1000 / 60)} min)`)
+      console.log(`✅ Utilisation du cache funnel ${label} (age: ${Math.round((Date.now() - cache.timestamp) / 1000 / 60)} min)`)
       return cache.data
     }
   } catch {}
 
   try {
-    const data = await fetchGA4DailyFunnelSteps(propertyIdV2)
-    await fs.writeFile(funnelStepsCachePath, JSON.stringify({ timestamp: Date.now(), data }, null, 2))
-    console.log('💾 Cache funnel HP→typologie mis à jour')
+    const data = await fetchGA4DailyFunnelSteps(propertyId)
+    await fs.writeFile(cachePath, JSON.stringify({ timestamp: Date.now(), data }, null, 2))
+    console.log(`💾 Cache funnel ${label} mis à jour`)
     return data
   } catch (error) {
-    console.error('❌ Erreur GA4 funnel HP→typologie:', error)
+    console.error(`❌ Erreur GA4 funnel ${label}:`, error)
     try {
-      const content = await fs.readFile(funnelStepsCachePath, 'utf-8')
+      const content = await fs.readFile(cachePath, 'utf-8')
       const cache = JSON.parse(content) as { timestamp: number; data: DailyFunnelEntry[] }
-      console.log('⚠️ Fallback sur cache expiré funnel HP→typologie')
+      console.log(`⚠️ Fallback sur cache expiré funnel ${label}`)
       return cache.data
     } catch {
       return []
     }
   }
+}
+
+export async function getDailyFunnelHpToTypology(): Promise<DailyFunnelEntry[]> {
+  return getDailyFunnelHpToTypologyFor('fr')
+}
+
+export async function getDailyFunnelHpToTypologyEs(): Promise<DailyFunnelEntry[]> {
+  return getDailyFunnelHpToTypologyFor('es')
 }
 
 // Obtenir les visiteurs quotidiens V2 filtrés par agences (rewrite) - OPTIMISÉ
